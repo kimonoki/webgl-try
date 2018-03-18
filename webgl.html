@@ -1,0 +1,232 @@
+<!--
+Copyright 2011 (C) by Guido D'Albore (guido@bitstorm.it)
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<html>
+<head>
+    <title>3D spheres</title>
+    <script type="text/javascript">
+        var sphere = new Sphere3D();
+        var rotation = 0;
+        var distance = 0;
+        var mouseDown = false;
+
+
+        function Point3D() {
+            this.x = 0;
+            this.y = 0;
+            this.z = 0;
+        }
+
+
+        //create a sphere
+        function Sphere3D(radius) {
+            this.point = new Array();
+            this.color = "rgb(100,0,255)"
+            this.radius = (typeof(radius) == "undefined") ? 20.0 : radius;
+            this.radius = (typeof(radius) != "number") ? 20.0 : radius;
+            this.numberOfVertexes = 0;
+
+            for (alpha = 0; alpha <= 6.28; alpha += 0.17) {
+                p = this.point[this.numberOfVertexes] = new Point3D();
+
+                p.x = Math.cos(alpha) * this.radius;
+                p.y = 0;
+                p.z = Math.sin(alpha) * this.radius;
+
+                this.numberOfVertexes++;
+            }
+
+
+            for (var direction = 1; direction >= -1; direction -= 2) {
+                for (var beta = 0.17; beta < 1.445; beta += 0.17) {
+                    var radius = Math.cos(beta) * this.radius;
+                    var fixedY = Math.sin(beta) * this.radius * direction;
+
+                    for (var alpha = 0; alpha < 6.28; alpha += 0.17) {
+                        p = this.point[this.numberOfVertexes] = new Point3D();
+
+                        p.x = Math.cos(alpha) * radius;
+                        p.y = fixedY;
+                        p.z = Math.sin(alpha) * radius;
+
+                        this.numberOfVertexes++;
+                    }
+                }
+            }
+
+        }
+
+        function rotateX(point, radians) {
+            var x = point.x;
+            point.x = (x * Math.cos(radians)) + (point.z * Math.sin(radians) * -1.0);
+            point.z = (x * Math.sin(radians)) + (point.z * Math.cos(radians));
+        }
+
+        function rotateY(point, radians) {
+            var y = point.y;
+            point.y = (y * Math.cos(radians)) + (point.z * Math.sin(radians) * -1.0);
+            point.z = (y * Math.sin(radians)) + (point.z * Math.cos(radians));
+        }
+
+
+        function projection(xy, z, xyOffset, zOffset, distance) {
+            return ((distance * xy) / (z - zOffset)) + xyOffset;
+        }
+
+        function render() {
+            var canvas = document.getElementById("sphere3d");
+
+            var width = canvas.getAttribute("width");
+            var height = canvas.getAttribute("height");
+            var ctx = canvas.getContext('2d');
+            var x, y;
+
+            var p = new Point3D();
+
+            ctx.save();
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.globalCompositeOperation = "lighter";
+
+            for (i = 0; i < sphere.numberOfVertexes; i++) {
+
+                p.x = sphere.point[i].x;
+                p.y = sphere.point[i].y;
+                p.z = sphere.point[i].z;
+
+                rotateX(p, rotationX);
+                rotateY(p, rotationY);
+
+
+                x = projection(p.x, p.z, width / 2.0, 100.0, distance);
+                y = projection(p.y, p.z, height / 2.0, 100.0, distance);
+
+                if ((x >= 0) && (x < width)) {
+                    if ((y >= 0) && (y < height)) {
+                        if (p.z < 0) {
+                            drawPoint(ctx, x, y, 4, "rgba(200,200,200,0.6)");
+                        } else {
+                            drawPointWithGradient(ctx, x, y, 10, "rgb(0,200,0)", 0.8);
+                        }
+                    }
+                }
+            }
+
+            ctx.restore();
+
+            ctx.fillStyle = "rgb(150,150,150)";
+
+            if (distance < 1000) {
+                distance += 10;
+            }
+
+            // handle mouse move events
+            canvas.onmousedown = handleMouseDown;
+            document.onmouseup = handleMouseUp;
+            document.onmousemove = handleMouseMove;
+
+
+        }
+
+
+        //store last mouse position
+        var lastMouseX = null;
+        var lastMouseY = null;
+        var deltaX = 0;
+        var deltaY = 0;
+        var rotationX = 0;
+        var rotationY = 0;
+
+
+        function handleMouseMove(event) {
+            if (!mouseDown) {
+                return;
+            }
+            var newX = event.clientX;
+            var newY = event.clientY;
+
+            deltaX = newX - lastMouseX;
+            deltaY = newY - lastMouseY;
+
+
+            rotationX += deltaX/500;
+            rotationY += deltaY/500;
+
+
+        }
+
+        function handleMouseUp(event) {
+            mouseDown = false;
+
+        }
+
+        function handleMouseDown(event, ctx) {
+            mouseDown = true;
+
+            lastMouseX = event.clientX;
+            lastMouseY = event.clientY;
+        }
+
+        function drawPoint(ctx, x, y, size, color) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.arc(x, y, size, 0, 2 * Math.PI, true);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawPointWithGradient(ctx, x, y, size, color, gradient) {
+            var reflection;
+
+            reflection = size / 4;
+
+            ctx.save();
+            ctx.translate(x, y);
+            var radgrad = ctx.createRadialGradient(-reflection, -reflection, reflection, 0, 0, size);
+
+            radgrad.addColorStop(0, '#FFFFFF');
+            radgrad.addColorStop(gradient, color);
+            radgrad.addColorStop(1, 'rgba(1,159,98,0)');
+
+            ctx.fillStyle = radgrad;
+            ctx.fillRect(-size, -size, size * 2, size * 2);
+            ctx.restore();
+        }
+
+
+        function init() {
+            // Set framerate to 30 fps
+            setInterval(render, 1000 / 30);
+
+        }
+
+    </script>
+    <style type="text/css">
+        canvas {
+            border: 4px solid #A0A0A0;
+            background: black;
+            display: block;
+        }
+    </style>
+
+</head>
+<body onload="init();">
+<canvas id="sphere3d" width="500" height="500">
+
+</canvas>
+</body>
+</html>
